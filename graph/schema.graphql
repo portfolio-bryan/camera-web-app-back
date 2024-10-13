@@ -1,0 +1,35 @@
+# GraphQL schema example
+#
+# https://gqlgen.com/getting-started/
+
+type Place {
+  id: String!
+  name: String!
+  userID: String!
+  cameras: [Camera!]!
+}
+
+type Camera {
+  id: String!
+  placeID: String!
+  userID: String!
+}
+
+type User {
+  id: String!
+  email: String!
+  name: String!
+}
+
+input GetPlacesCriteria {
+  userID: String
+}
+
+input GetCamerasCriteria {
+  placeID: String
+}
+
+type Query {
+  getPlaces(criteria: GetPlacesCriteria): [Place!]!
+  getCameras(criteria: GetCamerasCriteria): [Camera!]!
+}

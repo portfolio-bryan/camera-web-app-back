@@ -1,6 +1,6 @@
 package user
 
-import "github.com/bperezgo/rtsp/pkg/domain/valueobject"
+import "github.com/bperezgo/rtsp/shared/domain/valueobject"
 
 type User struct {
 	id    valueobject.ID
