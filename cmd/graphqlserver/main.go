@@ -43,10 +43,11 @@ func main() {
 	port := c.ServerPort
 
 	r := gin.Default()
+	r.Use(middlewares.CorsMiddleware())
 	r.Use(middlewares.GinContextToContextMiddleware())
 	r.Use(middlewares.MetadataMiddleware())
 	r.Use(middlewares.LoggingMiddleware())
-	r.POST("/query", graphqlHandler())
+	r.POST("/graphql", graphqlHandler())
 	r.GET("/", playgroundHandler())
 	if err := r.Run(fmt.Sprintf(":%s", port)); err != nil {
 		log.Fatal("error running server", err)
