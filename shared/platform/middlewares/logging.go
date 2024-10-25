@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func LoggingMiddleware() gin.HandlerFunc {
+func Logging() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var requestID string
 

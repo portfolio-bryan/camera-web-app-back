@@ -20,6 +20,14 @@ type Config struct {
 	POSTGRES_SSLMODE        string
 	POSTGRES_MAX_IDLE_CONNS int
 	POSTGRES_MAX_OPEN_CONNS int
+	Otel                    Otel
+}
+
+type Otel struct {
+	ServiceName          string
+	ExporterOtlpEndpoint string
+	ExporterOtlpProtocol string
+	ExporterOtlpHeaders  string
 }
 
 var config *Config
@@ -92,6 +100,14 @@ func GetConfig() *Config {
 		log.Panic("postgresMaxOpenConns was not be processed")
 	}
 
+	otelServiceName := os.Getenv("OTEL_SERVICE_NAME")
+
+	otelExporterOtlpEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+
+	otelExporterOtlpProtocol := os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL")
+
+	otelExporterOtlpHeaders := os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")
+
 	config = &Config{
 		ServerPort:              serverPort,
 		Environment:             environment,
@@ -103,6 +119,12 @@ func GetConfig() *Config {
 		POSTGRES_SSLMODE:        postgresSSLMode,
 		POSTGRES_MAX_IDLE_CONNS: postgresMaxIdleConns,
 		POSTGRES_MAX_OPEN_CONNS: postgresMaxOpenConns,
+		Otel: Otel{
+			ServiceName:          otelServiceName,
+			ExporterOtlpEndpoint: otelExporterOtlpEndpoint,
+			ExporterOtlpProtocol: otelExporterOtlpProtocol,
+			ExporterOtlpHeaders:  otelExporterOtlpHeaders,
+		},
 	}
 	return config
 }

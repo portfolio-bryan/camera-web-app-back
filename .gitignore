@@ -1,3 +1,4 @@
 .vscode
 temporal_assets
 .env
+__debug_bin*

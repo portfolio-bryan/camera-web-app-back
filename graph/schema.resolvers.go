@@ -8,10 +8,20 @@ import (
 	"context"
 
 	"github.com/bperezgo/rtsp/graph/model"
+	"github.com/bperezgo/rtsp/shared/domain/errors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // GetPlaces is the resolver for the getPlaces field.
 func (r *queryResolver) GetPlaces(ctx context.Context, criteria *model.GetPlacesCriteria) ([]*model.Place, error) {
+	tracer := otel.Tracer("rtsp")
+	ctx, span := tracer.Start(ctx, "expensive-operation")
+	defer span.End()
+
+	span.AddEvent("expensive-operation-started", trace.WithAttributes(attribute.String("expensive-operation", "getPlaces")))
+
 	return []*model.Place{
 		{
 			ID:      "1",
@@ -25,7 +35,7 @@ func (r *queryResolver) GetPlaces(ctx context.Context, criteria *model.GetPlaces
 			UserID:  "1",
 			Cameras: []*model.Camera{},
 		},
-	}, nil
+	}, &ErrorTest{}
 }
 
 // GetCameras is the resolver for the getCameras field.
@@ -58,3 +68,22 @@ func (r *queryResolver) GetCameras(ctx context.Context, criteria *model.GetCamer
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type queryResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+
+type ErrorTest struct{}
+
+func (e *ErrorTest) Error() string {
+	return "Error Test"
+}
+func (e *ErrorTest) Code() errors.ErrorCode {
+	return errors.ErrorCode("error_test")
+}
+func (e *ErrorTest) Type() errors.ErrorType {
+	return errors.BusinessErrorType
+}
