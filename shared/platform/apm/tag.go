@@ -10,9 +10,14 @@ import (
 )
 
 const (
+	xTracerIDHeader = "X-Tracer-Id"
+)
+
+const (
 	requestVariablesPrefix        = "gql.request.variables"
 	resolverArgsPrefix            = "gql.resolver.args"
 	resolverErrorPrefix           = "gql.resolver.error"
+	xTracerIDKey                  = attribute.Key("tracer.id")
 	requestQueryKey               = attribute.Key("gql.request.query")
 	requestComplexityLimitKey     = attribute.Key("gql.request.complexityLimit")
 	requestOperationComplexityKey = attribute.Key("gql.request.operationComplexity")
@@ -22,6 +27,10 @@ const (
 	resolverAliasKey              = attribute.Key("gql.resolver.alias")
 	resolverHasErrorKey           = attribute.Key("gql.resolver.hasError")
 )
+
+func XTracerIDHeader(xID string) attribute.KeyValue {
+	return xTracerIDKey.String(xID)
+}
 
 // RequestQuery sets the request query.
 func RequestQuery(requestQuery string) attribute.KeyValue {

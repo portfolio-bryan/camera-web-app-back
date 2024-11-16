@@ -6,6 +6,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
+	"github.com/google/uuid"
 
 	otelcontrib "go.opentelemetry.io/contrib"
 	"go.opentelemetry.io/otel"
@@ -31,7 +32,7 @@ type Tracer struct {
 var _ interface {
 	graphql.HandlerExtension
 	graphql.ResponseInterceptor
-	graphql.FieldInterceptor
+	graphql.OperationInterceptor
 } = Tracer{}
 
 // ExtensionName returns the extension name.
@@ -52,13 +53,19 @@ func (a Tracer) InterceptResponse(ctx context.Context, next graphql.ResponseHand
 
 	opName := operationName(ctx)
 	spanKind := a.spanKindSelector(opName)
-	ctx, span := a.tracer.Start(ctx, opName, oteltrace.WithSpanKind(spanKind))
+	xID := xTracerID(ctx)
+	ctx, span := a.tracer.Start(ctx, opName, oteltrace.WithSpanKind(spanKind), oteltrace.WithAttributes(
+		XTracerIDHeader(xID),
+	))
 	defer span.End()
 	if !span.IsRecording() {
 		return next(ctx)
 	}
 
 	oc := graphql.GetOperationContext(ctx)
+	span.SetAttributes(
+		RequestQuery(oc.RawQuery),
+	)
 
 	span.SetAttributes(
 		RequestQuery(oc.RawQuery),
@@ -96,43 +103,16 @@ func (a Tracer) InterceptResponse(ctx context.Context, next graphql.ResponseHand
 	return resp
 }
 
-// InterceptField intercepts the incoming request.
-func (a Tracer) InterceptField(ctx context.Context, next graphql.Resolver) (interface{}, error) {
-	fc := graphql.GetFieldContext(ctx)
-	if !a.shouldCreateSpanFromFields(fc) {
-		return next(ctx)
-	}
-	name := fc.Field.ObjectDefinition.Name + "/" + fc.Field.Name
-	spanKind := a.spanKindSelector(name)
-	ctx, span := a.tracer.Start(ctx,
-		name,
-		oteltrace.WithSpanKind(spanKind),
-	)
-	defer span.End()
-	if !span.IsRecording() {
-		return next(ctx)
+func (a Tracer) InterceptOperation(ctx context.Context, next graphql.OperationHandler) graphql.ResponseHandler {
+	// Validation of the X-Tracer-ID header is done in the middleware.
+	opCtx := graphql.GetOperationContext(ctx)
+	xTracerID := opCtx.Headers.Get(xTracerIDHeader)
+
+	if xTracerID == "" {
+		opCtx.Headers.Set(xTracerIDHeader, uuid.New().String())
 	}
 
-	span.SetAttributes(
-		ResolverPath(fc.Path().String()),
-		ResolverObject(fc.Field.ObjectDefinition.Name),
-		ResolverField(fc.Field.Name),
-		ResolverAlias(fc.Field.Alias),
-	)
-	span.SetAttributes(ResolverArgs(fc.Field.Arguments)...)
-
-	resp, err := next(ctx)
-
-	errList := graphql.GetFieldErrors(ctx, fc)
-	if len(errList) != 0 {
-		span.SetStatus(codes.Error, errList.Error())
-		span.RecordError(fmt.Errorf("graphql field errors: %v", errList.Error()))
-		span.SetAttributes(ResolverErrors(errList)...)
-	} else {
-		span.SetStatus(codes.Ok, "Finished successfully")
-	}
-
-	return resp, err
+	return next(ctx)
 }
 
 // Middleware sets up a handler to start tracing the incoming
@@ -192,6 +172,11 @@ func operationName(ctx context.Context) string {
 		return opContext.Operation.Name
 	}
 	return GetOperationName(ctx)
+}
+
+func xTracerID(ctx context.Context) string {
+	opCtx := graphql.GetOperationContext(ctx)
+	return opCtx.Headers.Get("X-Tracer-Id")
 }
 
 type operationNameCtxKey struct{}

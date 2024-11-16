@@ -30,6 +30,7 @@ func graphqlHandler(tracerProvider trace.TracerProvider) gin.HandlerFunc {
 	// server.Use(middlewares.XTracer)
 	// graphql.HandlerExtension
 	server.Use(apm.Middleware(apm.WithTracerProvider(tracerProvider)))
+	server.Use(middlewares.Auth{})
 
 	return func(c *gin.Context) {
 		server.ServeHTTP(c.Writer, c.Request)
