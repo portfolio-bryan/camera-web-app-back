@@ -142,14 +142,19 @@ func (sh *serverHandler) OnRecord(ctx *gortsplib.ServerHandlerOnRecordCtx) (*bas
 
 		switch medi.Type {
 		case description.MediaTypeVideo:
-			err := sh.rtpCmdHandler.ProcessRTPPacket(rtpstrategy.ProcessRTPPacketCommand{})
+			webRtcPacket, err := sh.rtpCmdHandler.ProcessRTPPacket(rtpstrategy.ProcessRTPPacketCommand{
+				Packet: pkt,
+				Format: forma,
+			})
 
 			if err != nil {
 				log.Printf("Error processing RTP packet: %v", err)
 			}
 
 			log.Printf("Video packet received, \n%v\n", pkt.Payload)
+			sh.stream.WritePacketRTP(medi, webRtcPacket)
 
+			return
 		case description.MediaTypeAudio:
 		case description.MediaTypeApplication:
 		}
