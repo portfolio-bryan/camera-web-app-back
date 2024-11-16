@@ -1,9 +1,11 @@
 package observability
 
-import "go.opentelemetry.io/otel/trace"
+import (
+	sharedob "github.com/bperezgo/rtsp/shared/domain/observability"
+)
 
 type SpanFactory struct {
-	span trace.Span
+	span sharedob.Span
 }
 
 func (s *SpanFactory) End() {

@@ -1,10 +1,12 @@
-package apm
+package observability
 
 import (
 	"context"
 	"log"
 
+	"github.com/bperezgo/rtsp/shared/constants"
 	"github.com/honeycombio/otel-config-go/otelconfig"
+	otelcontrib "go.opentelemetry.io/contrib"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -19,9 +21,14 @@ type HoneycombOptions struct {
 
 type HoneycombTracerProvider struct {
 	tracerProvider trace.TracerProvider
+	tracer         trace.Tracer
 	shutdownFn     func()
 	opts           HoneycombOptions
 }
+
+var _ interface {
+	TracerProvider
+} = (*HoneycombTracerProvider)(nil)
 
 func NewHoneycombTracerProvider(ctx context.Context, opts HoneycombOptions) *HoneycombTracerProvider {
 	if opts.Name == "" {
@@ -43,11 +50,21 @@ func NewHoneycombTracerProvider(ctx context.Context, opts HoneycombOptions) *Hon
 
 	otel.SetTracerProvider(tp)
 
+	tracer := tp.Tracer(
+		constants.TracerName,
+		trace.WithInstrumentationVersion(otelcontrib.Version()),
+	)
+
 	return &HoneycombTracerProvider{
 		tracerProvider: tp,
+		tracer:         tracer,
 		shutdownFn:     otelShutdown,
 		opts:           opts,
 	}
+}
+
+func (p *HoneycombTracerProvider) Tracer() Tracer {
+	return NewTracer(p.tracer)
 }
 
 func newSpanExporter(ctx context.Context) (sdktrace.SpanExporter, error) {

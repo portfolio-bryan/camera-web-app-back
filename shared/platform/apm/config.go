@@ -2,6 +2,7 @@ package apm
 
 import (
 	"github.com/99designs/gqlgen/graphql"
+	sharedob "github.com/bperezgo/rtsp/shared/domain/observability"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -12,12 +13,10 @@ type SpanKindSelectorFunc func(operationName string) trace.SpanKind
 
 // config is used to configure the mongo tracer.
 type config struct {
-	TracerProvider             trace.TracerProvider
-	Tracer                     trace.Tracer
+	TracerProvider             sharedob.TracerProvider
 	ComplexityExtensionName    string
 	RequestVariablesBuilder    RequestVariablesBuilderFunc
 	ShouldCreateSpanFromFields FieldsPredicateFunc
-	SpanKindSelectorFunc       SpanKindSelectorFunc
 }
 
 // RequestVariablesBuilderFunc is the signature of the function
@@ -37,7 +36,7 @@ func (o optionFunc) apply(c *config) {
 
 // WithTracerProvider specifies a tracer provider to use for creating a tracer.
 // If none is specified, the global provider is used.
-func WithTracerProvider(provider trace.TracerProvider) Option {
+func WithTracerProvider(provider sharedob.TracerProvider) Option {
 	return optionFunc(func(cfg *config) {
 		cfg.TracerProvider = provider
 	})
@@ -72,12 +71,5 @@ func WithoutVariables() Option {
 func WithCreateSpanFromFields(predicate FieldsPredicateFunc) Option {
 	return optionFunc(func(cfg *config) {
 		cfg.ShouldCreateSpanFromFields = predicate
-	})
-}
-
-// WithSpanKindSelector allows specifying a custom function that defines the SpanKind based on the name of the operation.
-func WithSpanKindSelector(spanKindSelector SpanKindSelectorFunc) Option {
-	return optionFunc(func(cfg *config) {
-		cfg.SpanKindSelectorFunc = spanKindSelector
 	})
 }

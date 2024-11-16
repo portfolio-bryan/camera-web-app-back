@@ -10,10 +10,6 @@ import (
 )
 
 const (
-	xTracerIDHeader = "X-Tracer-Id"
-)
-
-const (
 	requestVariablesPrefix        = "gql.request.variables"
 	resolverArgsPrefix            = "gql.resolver.args"
 	resolverErrorPrefix           = "gql.resolver.error"

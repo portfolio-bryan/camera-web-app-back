@@ -11,14 +11,15 @@ import (
 	"github.com/bperezgo/rtsp/graph"
 	"github.com/bperezgo/rtsp/internal/app/observability"
 	"github.com/bperezgo/rtsp/internal/app/places"
+	internalmiddleware "github.com/bperezgo/rtsp/internal/platform/middleware"
+	sharedobservability "github.com/bperezgo/rtsp/shared/domain/observability"
 	"github.com/bperezgo/rtsp/shared/platform/apm"
 	"github.com/bperezgo/rtsp/shared/platform/middlewares"
 	"github.com/gin-gonic/gin"
-	"go.opentelemetry.io/otel/trace"
 )
 
 // Defining the Graphql handler
-func graphqlHandler(tracerProvider trace.TracerProvider) gin.HandlerFunc {
+func graphqlHandler(tracerProvider sharedobservability.TracerProvider) gin.HandlerFunc {
 	getPlacesService := places.NewService()
 	observabilityProvider := observability.New(tracerProvider)
 
@@ -30,7 +31,9 @@ func graphqlHandler(tracerProvider trace.TracerProvider) gin.HandlerFunc {
 	// server.Use(middlewares.XTracer)
 	// graphql.HandlerExtension
 	server.Use(apm.Middleware(apm.WithTracerProvider(tracerProvider)))
-	server.Use(middlewares.Auth{})
+	server.Use(&internalmiddleware.Auth{
+		TracerProvider: tracerProvider,
+	})
 
 	return func(c *gin.Context) {
 		server.ServeHTTP(c.Writer, c.Request)
@@ -59,7 +62,7 @@ func main() {
 
 	// wrappedHandler := otelhttp.NewHandler(handler, "hello")
 
-	honeycombProvider := apm.NewHoneycombTracerProvider(ctx, apm.HoneycombOptions{
+	honeycombProvider := sharedobservability.NewHoneycombTracerProvider(ctx, sharedobservability.HoneycombOptions{
 		Name: c.Otel.ServiceName,
 	})
 
@@ -68,10 +71,10 @@ func main() {
 	r := gin.Default()
 	// r.Use(middlewares.Tracer())
 	r.Use(middlewares.Cors())
-	r.Use(middlewares.GinContextToContextMiddleware())
-	r.Use(middlewares.MetadataMiddleware())
-	r.Use(middlewares.Logging())
-	r.POST("/query", graphqlHandler(honeycombProvider.TracerProvider()))
+	// r.Use(middlewares.GinContextToContextMiddleware())
+	// r.Use(middlewares.MetadataMiddleware())
+	// r.Use(middlewares.Logging())
+	r.POST("/query", graphqlHandler(honeycombProvider))
 	r.GET("/", playgroundHandler())
 	if err := r.Run(fmt.Sprintf(":%s", port)); err != nil {
 		log.Fatal("error running server", err)

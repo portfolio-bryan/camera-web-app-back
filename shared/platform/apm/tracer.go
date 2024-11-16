@@ -6,16 +6,13 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
+	"github.com/bperezgo/rtsp/shared/domain/observability"
 	"github.com/google/uuid"
 
-	otelcontrib "go.opentelemetry.io/contrib"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
-	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 const (
-	tracerName      = "github.com/ravilushqa/otelgqlgen"
 	extensionName   = "OpenTelemetry"
 	complexityLimit = "ComplexityLimit"
 )
@@ -23,10 +20,9 @@ const (
 // Tracer is a GraphQL extension that traces GraphQL requests.
 type Tracer struct {
 	complexityExtensionName     string
-	tracer                      oteltrace.Tracer
+	tracer                      observability.Tracer
 	requestVariablesBuilderFunc RequestVariablesBuilderFunc
 	shouldCreateSpanFromFields  FieldsPredicateFunc
-	spanKindSelector            SpanKindSelectorFunc
 }
 
 var _ interface {
@@ -51,12 +47,9 @@ func (a Tracer) InterceptResponse(ctx context.Context, next graphql.ResponseHand
 		return next(ctx)
 	}
 
+	// TODO: Define logic to define the OperationName with SetOperationName function
 	opName := operationName(ctx)
-	spanKind := a.spanKindSelector(opName)
-	xID := xTracerID(ctx)
-	ctx, span := a.tracer.Start(ctx, opName, oteltrace.WithSpanKind(spanKind), oteltrace.WithAttributes(
-		XTracerIDHeader(xID),
-	))
+	ctx, span := a.tracer.Start(ctx, opName)
 	defer span.End()
 	if !span.IsRecording() {
 		return next(ctx)
@@ -67,9 +60,6 @@ func (a Tracer) InterceptResponse(ctx context.Context, next graphql.ResponseHand
 		RequestQuery(oc.RawQuery),
 	)
 
-	span.SetAttributes(
-		RequestQuery(oc.RawQuery),
-	)
 	complexityExtension := a.complexityExtensionName
 	if complexityExtension == "" {
 		complexityExtension = complexityLimit
@@ -106,11 +96,14 @@ func (a Tracer) InterceptResponse(ctx context.Context, next graphql.ResponseHand
 func (a Tracer) InterceptOperation(ctx context.Context, next graphql.OperationHandler) graphql.ResponseHandler {
 	// Validation of the X-Tracer-ID header is done in the middleware.
 	opCtx := graphql.GetOperationContext(ctx)
-	xTracerID := opCtx.Headers.Get(xTracerIDHeader)
+	xTracerID := opCtx.Headers.Get(observability.XTracerIDHeader)
 
 	if xTracerID == "" {
-		opCtx.Headers.Set(xTracerIDHeader, uuid.New().String())
+		xTracerID = uuid.New().String()
+		opCtx.Headers.Set(observability.XTracerIDHeader, xTracerID)
 	}
+
+	ctx = context.WithValue(ctx, observability.XTracerIDCtxKey, xTracerID)
 
 	return next(ctx)
 }
@@ -124,7 +117,7 @@ func Middleware(opts ...Option) Tracer {
 		opt.apply(&cfg)
 	}
 	if cfg.TracerProvider == nil {
-		cfg.TracerProvider = otel.GetTracerProvider()
+		panic("TracerProvider is required")
 	}
 	if cfg.RequestVariablesBuilder == nil {
 		cfg.RequestVariablesBuilder = RequestVariables
@@ -132,20 +125,13 @@ func Middleware(opts ...Option) Tracer {
 	if cfg.ShouldCreateSpanFromFields == nil {
 		cfg.ShouldCreateSpanFromFields = alwaysTrue()
 	}
-	if cfg.SpanKindSelectorFunc == nil {
-		cfg.SpanKindSelectorFunc = alwaysServer()
-	}
 
-	tracer := cfg.TracerProvider.Tracer(
-		tracerName,
-		oteltrace.WithInstrumentationVersion(otelcontrib.Version()),
-	)
+	tracer := cfg.TracerProvider.Tracer()
 
 	return Tracer{
 		tracer:                      tracer,
 		requestVariablesBuilderFunc: cfg.RequestVariablesBuilder,
 		shouldCreateSpanFromFields:  cfg.ShouldCreateSpanFromFields,
-		spanKindSelector:            cfg.SpanKindSelectorFunc,
 	}
 
 }
@@ -154,12 +140,6 @@ func Middleware(opts ...Option) Tracer {
 func alwaysTrue() FieldsPredicateFunc {
 	return func(_ *graphql.FieldContext) bool {
 		return true
-	}
-}
-
-func alwaysServer() SpanKindSelectorFunc {
-	return func(_ string) oteltrace.SpanKind {
-		return oteltrace.SpanKindServer
 	}
 }
 
@@ -172,11 +152,6 @@ func operationName(ctx context.Context) string {
 		return opContext.Operation.Name
 	}
 	return GetOperationName(ctx)
-}
-
-func xTracerID(ctx context.Context) string {
-	opCtx := graphql.GetOperationContext(ctx)
-	return opCtx.Headers.Get("X-Tracer-Id")
 }
 
 type operationNameCtxKey struct{}

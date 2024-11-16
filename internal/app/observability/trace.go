@@ -3,22 +3,23 @@ package observability
 import (
 	"context"
 
-	"go.opentelemetry.io/otel/trace"
+	sharedob "github.com/bperezgo/rtsp/shared/domain/observability"
 )
 
 type Tracer struct {
-	tp trace.TracerProvider
+	tracer sharedob.Tracer
 }
 
-func New(tp trace.TracerProvider) Tracer {
+func New(tp sharedob.TracerProvider) Tracer {
+	tracer := tp.Tracer()
+
 	return Tracer{
-		tp: tp,
+		tracer: tracer,
 	}
 }
 
 func (t *Tracer) StartSpan(ctx context.Context, operationName string) (context.Context, SpanFactory) {
-	tracer := t.tp.Tracer(operationName)
-	ctx, span := tracer.Start(ctx, operationName)
+	ctx, span := t.tracer.Start(ctx, operationName)
 
 	return ctx, SpanFactory{
 		span: span,
