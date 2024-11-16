@@ -42,3 +42,7 @@ func NewID(value string) (ID, error) {
 		value: value,
 	}, nil
 }
+
+func (i ID) Value() string {
+	return i.value
+}

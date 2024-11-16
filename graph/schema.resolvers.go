@@ -8,38 +8,37 @@ import (
 	"context"
 
 	"github.com/bperezgo/rtsp/graph/model"
-	"github.com/bperezgo/rtsp/shared/domain/errors"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
+	"github.com/bperezgo/rtsp/internal/domain/aggregates/place"
+	"github.com/samber/lo"
 )
 
 // GetPlaces is the resolver for the getPlaces field.
 func (r *queryResolver) GetPlaces(ctx context.Context, criteria *model.GetPlacesCriteria) ([]*model.Place, error) {
-	tracer := otel.Tracer("rtsp")
-	ctx, span := tracer.Start(ctx, "expensive-operation")
+	ctx, span := r.observabilityProvider.StartSpan(ctx, "queryResolver.GetPlaces")
 	defer span.End()
 
-	span.AddEvent("expensive-operation-started", trace.WithAttributes(attribute.String("expensive-operation", "getPlaces")))
+	places, err := r.placesService.GetPlaces(ctx)
 
-	return []*model.Place{
-		{
-			ID:      "1",
-			Name:    "Place 1",
-			UserID:  "1",
-			Cameras: []*model.Camera{},
-		},
-		{
-			ID:      "2",
-			Name:    "Place 2",
-			UserID:  "1",
-			Cameras: []*model.Camera{},
-		},
-	}, &ErrorTest{}
+	if err != nil {
+		return []*model.Place{}, err
+	}
+
+	return lo.Map(places, func(p place.Place, _ int) *model.Place {
+		dto := p.ToDTO()
+
+		return &model.Place{
+			ID:     dto.ID,
+			Name:   dto.Name,
+			UserID: dto.UserID,
+		}
+	}), nil
 }
 
 // GetCameras is the resolver for the getCameras field.
 func (r *queryResolver) GetCameras(ctx context.Context, criteria *model.GetCamerasCriteria) ([]*model.Camera, error) {
+	_, span := r.observabilityProvider.StartSpan(ctx, "queryResolver.GetCameras")
+	defer span.End()
+
 	return []*model.Camera{
 		{
 			ID:      "1",
@@ -69,21 +68,14 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type queryResolver struct{ *Resolver }
 
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+// type ErrorTest struct{}
 
-type ErrorTest struct{}
-
-func (e *ErrorTest) Error() string {
-	return "Error Test"
-}
-func (e *ErrorTest) Code() errors.ErrorCode {
-	return errors.ErrorCode("error_test")
-}
-func (e *ErrorTest) Type() errors.ErrorType {
-	return errors.BusinessErrorType
-}
+// func (e *ErrorTest) Error() string {
+// 	return "Error Test"
+// }
+// func (e *ErrorTest) Code() errors.ErrorCode {
+// 	return errors.ErrorCode("error_test")
+// }
+// func (e *ErrorTest) Type() errors.ErrorType {
+// 	return errors.BusinessErrorType
+// }

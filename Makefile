@@ -8,7 +8,7 @@ install:
 
 prepare: install migrate-up
 
-start:
+start-graphql-server:
 	go run cmd/main.go
 
 test:

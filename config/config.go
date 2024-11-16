@@ -44,7 +44,7 @@ func InitConfig() error {
 		if err != nil {
 			return err
 		}
-		p := path.Join(cwd, ".env")
+		p := path.Join(cwd, "../../.env")
 		return godotenv.Load(os.ExpandEnv(p))
 	}
 

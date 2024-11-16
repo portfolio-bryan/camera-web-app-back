@@ -1,6 +1,9 @@
 package place
 
-import "github.com/bperezgo/rtsp/shared/domain/valueobject"
+import (
+	"github.com/bperezgo/rtsp/internal/domain/dto"
+	"github.com/bperezgo/rtsp/shared/domain/valueobject"
+)
 
 type PlaceName struct {
 	value string
@@ -33,4 +36,12 @@ func New(id string, name string, userID string) (Place, error) {
 	}
 
 	return Place{id: voID, name: voName, userID: voUserID}, nil
+}
+
+func (p Place) ToDTO() dto.Place {
+	return dto.Place{
+		ID:     p.id.Value(),
+		Name:   p.name.value,
+		UserID: p.userID.Value(),
+	}
 }
