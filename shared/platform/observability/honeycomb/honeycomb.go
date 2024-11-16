@@ -1,21 +1,25 @@
-package observability
+package honeycomb
 
 import (
 	"context"
 	"log"
 
 	"github.com/bperezgo/rtsp/shared/constants"
+	"github.com/bperezgo/rtsp/shared/domain/observability"
 	"github.com/honeycombio/otel-config-go/otelconfig"
 	otelcontrib "go.opentelemetry.io/contrib"
 	"go.opentelemetry.io/otel"
+
+	// "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	// "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
-type HoneycombOptions struct {
+type Options struct {
 	Name string
 }
 
@@ -23,14 +27,14 @@ type HoneycombTracerProvider struct {
 	tracerProvider trace.TracerProvider
 	tracer         trace.Tracer
 	shutdownFn     func()
-	opts           HoneycombOptions
+	opts           Options
 }
 
 var _ interface {
-	TracerProvider
+	observability.TracerProvider
 } = (*HoneycombTracerProvider)(nil)
 
-func NewHoneycombTracerProvider(ctx context.Context, opts HoneycombOptions) *HoneycombTracerProvider {
+func NewTracerProvider(ctx context.Context, opts Options) *HoneycombTracerProvider {
 	if opts.Name == "" {
 		log.Fatal("service name is required")
 	}
@@ -46,7 +50,9 @@ func NewHoneycombTracerProvider(ctx context.Context, opts HoneycombOptions) *Hon
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 
-	tp := newTraceProvider(spanExp, opts)
+	res := newResource(opts)
+
+	tp := newTraceProvider(res, spanExp, opts)
 
 	otel.SetTracerProvider(tp)
 
@@ -63,20 +69,29 @@ func NewHoneycombTracerProvider(ctx context.Context, opts HoneycombOptions) *Hon
 	}
 }
 
-func (p *HoneycombTracerProvider) Tracer() Tracer {
-	return NewTracer(p.tracer)
+func (p *HoneycombTracerProvider) Tracer() observability.Tracer {
+	return observability.NewTracer(p.tracer)
 }
 
 func newSpanExporter(ctx context.Context) (sdktrace.SpanExporter, error) {
 	return otlptracegrpc.New(ctx)
 }
 
-// func newMetricExporter(ctx context.Context) (sdkmetric.Exporter, error) {
-// 	returnotlptracegrpc.New(ctx)
+// func newMetricExporter(ctx context.Context, res *resource.Resource) *metric.MeterProvider {
+// 	metricExp, err := otlpmetricgrpc.New(ctx)
+
+// 	if err != nil {
+// 		log.Fatalf("failed to create exporter: %v", err)
+// 	}
+
+// 	return metric.NewMeterProvider(
+// 		metric.WithResource(res),
+// 		metric.WithReader(metric.NewPeriodicReader(metricExp)),
+// 	)
 // }
 
-func newTraceProvider(exp sdktrace.SpanExporter, opts HoneycombOptions) *sdktrace.TracerProvider {
-	r, err := resource.Merge(
+func newResource(opts Options) *resource.Resource {
+	res, err := resource.Merge(
 		resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
@@ -88,9 +103,13 @@ func newTraceProvider(exp sdktrace.SpanExporter, opts HoneycombOptions) *sdktrac
 		panic(err)
 	}
 
+	return res
+}
+
+func newTraceProvider(res *resource.Resource, exp sdktrace.SpanExporter, opts Options) *sdktrace.TracerProvider {
 	return sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exp),
-		sdktrace.WithResource(r),
+		sdktrace.WithResource(res),
 	)
 }
 

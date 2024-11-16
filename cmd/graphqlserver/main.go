@@ -15,6 +15,7 @@ import (
 	sharedobservability "github.com/bperezgo/rtsp/shared/domain/observability"
 	"github.com/bperezgo/rtsp/shared/platform/apm"
 	"github.com/bperezgo/rtsp/shared/platform/middlewares"
+	"github.com/bperezgo/rtsp/shared/platform/observability/honeycomb"
 	"github.com/gin-gonic/gin"
 )
 
@@ -62,7 +63,7 @@ func main() {
 
 	// wrappedHandler := otelhttp.NewHandler(handler, "hello")
 
-	honeycombProvider := sharedobservability.NewHoneycombTracerProvider(ctx, sharedobservability.HoneycombOptions{
+	honeycombProvider := honeycomb.NewTracerProvider(ctx, honeycomb.Options{
 		Name: c.Otel.ServiceName,
 	})
 
